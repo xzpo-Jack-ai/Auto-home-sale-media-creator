@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Keyword {
+  id        String   @id @default(uuid())
+  city      String
+  text      String
+  heat      Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([city])
+  @@index([createdAt])
+  @@map("keywords")
+}
+
+model Video {
+  id          String   @id @default(uuid())
+  externalId  String?  @unique
+  platform    String   // douyin, video_channel
+  title       String
+  author      String
+  authorId    String?
+  views       Int      @default(0)
+  likes       Int      @default(0)
+  shares      Int      @default(0)
+  comments    Int      @default(0)
+  coverUrl    String?
+  videoUrl    String?
+  duration    Int?
+  transcript  String?
+  publishedAt DateTime
+  keyword     String
+  city        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([keyword, city])
+  @@index([publishedAt])
+  @@map("videos")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  phone     String?  @unique
+  nickname  String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  publishLogs PublishLog[]
+
+  @@map("users")
+}
+
+model PublishLog {
+  id          String    @id @default(uuid())
+  userId      String
+  platform    String    // douyin, video_channel
+  videoUrl    String
+  title       String
+  description String?
+  tags        String[]
+  status      String    // pending, published, failed
+  externalUrl String?   // 发布后的外部链接
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("publish_logs")
+}

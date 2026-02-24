@@ -10,6 +10,7 @@ import { keywordRoutes } from './routes/keywords';
 import { videoRoutes } from './routes/videos';
 import { aiRoutes } from './routes/ai';
 import { uploadRoutes } from './routes/upload';
+import { videoLinkRoutes } from './routes/video-link';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -33,6 +34,7 @@ app.use('/api/keywords', keywordRoutes);
 app.use('/api/videos', videoRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/video-link', videoLinkRoutes);
 
 // Error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

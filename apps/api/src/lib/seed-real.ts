@@ -30,6 +30,57 @@ const REAL_VIDEOS = [
     city: '杭州',
     tags: ['捡漏', '公寓', '抖音房产', '杭州西湖区', '杭州买房'],
   },
+  {
+    // 用户提供：杭州板块预警
+    externalId: 'douyin-3elAYQ2RtWo',
+    platform: 'douyin' as const,
+    title: '杭州这四个板块2026年一定格外小心',
+    author: '杭州老陈说房',
+    authorId: 'hz_user_002',
+    views: 7480000,  // 估算：7.48
+    likes: 89000,
+    shares: 15600,
+    comments: 6200,
+    coverUrl: 'https://picsum.photos/300/400?random=hz002',
+    duration: 72,
+    transcript: `杭州这四个板块，2026年一定格外小心！
+第一个板块是奥体周边，目前价格已经透支未来3-5年的涨幅空间。
+第二个板块是未来科技城，互联网大厂裁员导致购买力下降，房价支撑不足。
+第三个板块是勾庄板块，供应量太大，同质化竞争严重。
+第四个板块是临安片区，距离主城区太远，配套兑现周期长。
+买房不是小事，一定要擦亮眼睛，选对板块比选对房子更重要。
+大家有什么想法，评论区聊聊。`,
+    publishedAt: new Date('2024-02-21'),
+    keyword: '杭州板块预警',
+    city: '杭州',
+    tags: ['杭州老陈说房', '杭州楼市', '杭州房产', '杭州楼市新政'],
+  },
+  {
+    // 用户提供：杭州买房攻略
+    externalId: 'douyin-bUnM6Qq6Utc',
+    platform: 'douyin' as const,
+    title: '假如26年我给自己在杭州买套房，我会怎么买？',
+    author: '杭州老陈说房',
+    authorId: 'hz_user_002',
+    views: 5640000,  // 估算：5.64
+    likes: 72000,
+    shares: 11800,
+    comments: 4800,
+    coverUrl: 'https://picsum.photos/300/400?random=hz003',
+    duration: 65,
+    transcript: `假如2026年我给自己在杭州买套房，我会怎么买？
+第一，我会优先考虑主城区，毕竟配套成熟，抗跌性强。
+第二，我会选择地铁沿线，通勤方便，未来转手也容易。
+第三，我会关注学区政策，但要注意政策变化风险。
+第四，我会控制总价，月供不超过家庭收入的40%，留出生活品质空间。
+第五，我会选择品牌开发商，物业质量有保障。
+买房是大事，量力而行，不要盲目跟风。
+希望这些建议对你有帮助。`,
+    publishedAt: new Date('2024-02-15'),
+    keyword: '杭州买房攻略',
+    city: '杭州',
+    tags: ['杭州老陈说房', '杭州楼市', '杭州房产', '杭州楼市新政', '杭州买房新政'],
+  },
 ];
 
 async function seedRealVideos() {
@@ -74,11 +125,11 @@ async function seedRealVideos() {
           text: video.keyword,
         },
       },
-      update: { heat: 95 },
+      update: { heat: Math.min(95 + (video.views / 1000000), 100) },
       create: {
         city: video.city,
         text: video.keyword,
-        heat: 95,
+        heat: Math.min(95 + (video.views / 1000000), 100),
       },
     });
 

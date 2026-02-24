@@ -17,6 +17,21 @@ router.get('/', async (req, res) => {
       pageSize
     );
 
+    // 如果没有找到视频，返回提示
+    if (videos.length === 0) {
+      res.json({
+        videos: [],
+        pagination: {
+          page: pageNum,
+          pageSize,
+          total: 0,
+          hasMore: false,
+        },
+        message: '该城市暂无视频数据，请先录入',
+      });
+      return;
+    }
+
     res.json({
       videos: videos.map((v, i) => ({
         id: v.id,
@@ -27,6 +42,7 @@ router.get('/', async (req, res) => {
         cover: v.coverUrl || `https://picsum.photos/300/400?random=${v.id}`,
         duration: v.duration || 60,
         publishedAt: v.publishedAt,
+        transcript: v.transcript, // 返回文案供前端使用
         rank: i + 1,
       })),
       pagination: {

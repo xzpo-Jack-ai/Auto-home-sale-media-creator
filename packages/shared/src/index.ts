@@ -60,3 +60,6 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+// 视频链接解析
+export * from './video-parser';

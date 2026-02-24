@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Copy, Camera, Upload, Sparkles, RefreshCw, CheckCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Copy, Camera, Upload, Sparkles, RefreshCw, CheckCircle, Send } from 'lucide-react';
 
 interface Video {
   id: string;
@@ -30,11 +31,20 @@ interface RewriteResult {
 }
 
 export function VideoDetail({ video, onBack, keyword, city }: VideoDetailProps) {
+  const router = useRouter();
   const [showGuide, setShowGuide] = useState(false);
   const [rewriteResult, setRewriteResult] = useState<RewriteResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'rewrite' | 'tips'>('rewrite');
+
+  const handleGoToPublish = () => {
+    const queryParams = new URLSearchParams({
+      videoId: video.id,
+      transcript: video.transcript || '',
+    });
+    router.push(`/publish?${queryParams.toString()}`);
+  };
 
   const handleRewrite = async () => {
     setShowGuide(true);
@@ -204,15 +214,28 @@ export function VideoDetail({ video, onBack, keyword, city }: VideoDetailProps) 
         {/* Bottom Actions */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-3">
           <div className="max-w-md mx-auto flex gap-3">
-            <button className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-900 text-white rounded-xl font-medium">
+            <button 
+              onClick={handleGoToPublish}
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-900 text-white rounded-xl font-medium"
+            >
               <Camera className="w-5 h-5" />
               拍摄视频
             </button>
-            <button className="flex-1 flex items-center justify-center gap-2 py-3 bg-orange-500 text-white rounded-xl font-medium">
+            <button 
+              onClick={handleGoToPublish}
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-orange-500 text-white rounded-xl font-medium"
+            >
               <Upload className="w-5 h-5" />
               上传视频
             </button>
           </div>
+          <button
+            onClick={handleGoToPublish}
+            className="w-full mt-3 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl font-medium flex items-center justify-center gap-2"
+          >
+            <Send className="w-5 h-5" />
+            快捷发布
+          </button>
         </div>
       </div>
     );

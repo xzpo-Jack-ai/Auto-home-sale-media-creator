@@ -1,0 +1,22 @@
+{
+  "name": "房产自媒体助手",
+  "short_name": "房产助手",
+  "description": "为房产经纪人提供热词追踪、爆款视频分析和AI文案改写",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f97316",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -15,6 +15,7 @@ model Keyword {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([city, text])
   @@index([city])
   @@index([createdAt])
   @@map("keywords")
@@ -66,7 +67,7 @@ model PublishLog {
   videoUrl    String
   title       String
   description String?
-  tags        String[]
+  tags        String    // JSON 数组存储
   status      String    // pending, published, failed
   externalUrl String?   // 发布后的外部链接
   publishedAt DateTime?

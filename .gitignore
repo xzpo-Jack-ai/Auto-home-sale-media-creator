@@ -10,3 +10,8 @@ dist
 .turbo
 coverage
 *.tsbuildinfo
+
+# Database
+*.db
+*.db-journal
+prisma/dev.db

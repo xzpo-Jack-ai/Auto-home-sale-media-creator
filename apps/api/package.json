@@ -10,7 +10,8 @@
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:seed": "tsx src/lib/seed.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {

@@ -29,6 +29,8 @@ export interface SubtitleResult {
 const PYTHON_SCRIPT = path.join(__dirname, '../../scripts/extract-api-intercept.py');
 // ASR 兜底脚本（可选）
 const ASR_SCRIPT = path.join(__dirname, '../../scripts/asr-fallback.py');
+// 阿里云 ASR 脚本
+const ALIYUN_ASR_SCRIPT = path.join(__dirname, '../../scripts/aliyun-asr-sdk.py');
 
 /**
  * 检查依赖是否可用
@@ -131,21 +133,18 @@ export async function extractDouyinSubtitle(shareUrl: string): Promise<SubtitleR
 
     // 检查是否有字幕
     if (!result.transcript || result.transcript.trim().length === 0) {
-      // 尝试 ASR 兜底
-      const deps = await checkDependencies(true);
-      if (deps.asrScript && deps.whisper && deps.ytDlp) {
-        console.log('[SubtitleExtractor] 无自动字幕，尝试 ASR 兜底...');
-        const asrResult = await extractWithASR(shareUrl);
-        if (asrResult.transcript) {
-          return {
-            success: true,
-            transcript: asrResult.transcript.trim(),
-            title: result.title,
-            author: result.author,
-            duration: result.duration,
-            source: 'asr'
-          };
-        }
+      // 尝试阿里云 ASR 兜底（优先）
+      console.log('[SubtitleExtractor] 无自动字幕，尝试阿里云 ASR...');
+      const aliyunResult = await extractWithAliyunASR(shareUrl);
+      if (aliyunResult.transcript) {
+        return {
+          success: true,
+          transcript: aliyunResult.transcript.trim(),
+          title: result.title,
+          author: result.author,
+          duration: result.duration,
+          source: 'asr'
+        };
       }
       
       return {
@@ -153,7 +152,7 @@ export async function extractDouyinSubtitle(shareUrl: string): Promise<SubtitleR
         title: result.title,
         author: result.author,
         duration: result.duration,
-        error: '该视频没有自动字幕，且 ASR 提取失败',
+        error: '该视频没有自动字幕，ASR 提取失败或未配置',
         source: 'none'
       };
     }
@@ -195,6 +194,8 @@ function parsePythonOutput(output: string): {
   transcript?: string;
   transcriptLength?: number;
   error?: string;
+  audio_url?: string;
+  cost?: number;
 } {
   // 提取 JSON 部分
   const jsonStart = output.indexOf('===JSON_START===');
@@ -249,28 +250,78 @@ export async function batchExtractSubtitles(
 }
 
 /**
- * 使用 ASR 兜底提取
+ * 使用阿里云 ASR 提取
  */
-async function extractWithASR(videoUrl: string): Promise<{ transcript?: string; error?: string }> {
+async function extractWithAliyunASR(videoUrl: string): Promise<{ transcript?: string; error?: string }> {
   try {
+    // 检查阿里云配置
+    const config = process.env.ALIYUN_ACCESS_KEY_ID && 
+                   process.env.ALIYUN_ACCESS_KEY_SECRET && 
+                   process.env.ALIYUN_APP_KEY;
+    
+    if (!config) {
+      console.log('[AliyunASR] 未配置阿里云 AK/SK，跳过');
+      return { error: '未配置阿里云' };
+    }
+    
+    // 首先获取音频URL（通过 API 拦截脚本）
+    console.log('[AliyunASR] 获取音频 URL...');
+    const audioUrl = await getAudioUrl(videoUrl);
+    
+    if (!audioUrl) {
+      return { error: '无法获取音频 URL' };
+    }
+    
+    console.log(`[AliyunASR] 开始转写: ${audioUrl.substring(0, 60)}...`);
+    
     const { stdout } = await execFileAsync(
       'python3',
-      [ASR_SCRIPT, videoUrl],
+      [ALIYUN_ASR_SCRIPT, audioUrl],
       {
-        timeout: 180000, // ASR 需要更长时间
-        maxBuffer: 50 * 1024 * 1024,
+        timeout: 120000,
+        maxBuffer: 10 * 1024 * 1024,
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
       }
     );
 
     const result = parsePythonOutput(stdout);
+    
+    if (result.success && result.transcript) {
+      console.log(`[AliyunASR] 成功: ${result.transcript.length} 字符，费用: ¥${result.cost || 0}`);
+    }
+    
     return {
       transcript: result.transcript,
       error: result.error
     };
   } catch (error) {
-    console.error('[ASR] Error:', error);
-    return { error: 'ASR 提取失败' };
+    console.error('[AliyunASR] Error:', error);
+    return { error: '阿里云 ASR 失败' };
+  }
+}
+
+/**
+ * 获取视频音频 URL（通过 API 拦截）
+ */
+async function getAudioUrl(videoUrl: string): Promise<string | null> {
+  try {
+    // 使用 extract-full.py 的 audio_only 模式
+    const { stdout } = await execFileAsync(
+      'python3',
+      [path.join(__dirname, '../../scripts/extract-full.py'), videoUrl, 'audio_only'],
+      {
+        timeout: 60000,
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      }
+    );
+    
+    // 解析 JSON 输出
+    const result = parsePythonOutput(stdout);
+    return result.audio_url || null;
+  } catch (error) {
+    console.error('[GetAudioUrl] Error:', error);
+    return null;
   }
 }
 

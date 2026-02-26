@@ -5,7 +5,7 @@
  * 文档: https://help.aliyun.com/document_detail/90728.html
  */
 
-import { fetch } from 'undici';
+// 阿里云语音识别服务 - 简化版
 
 // 阿里云配置
 const ALIYUN_CONFIG = {

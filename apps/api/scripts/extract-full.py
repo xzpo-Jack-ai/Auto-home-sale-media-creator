@@ -243,31 +243,140 @@ async def asr_transcribe(audio_url: str, cookies_path: str) -> str:
             return None
 
 
+async def get_audio_url_only(video_url: str) -> dict:
+    """仅获取音频URL（用于阿里云ASR）"""
+    from playwright.async_api import async_playwright
+    
+    result = {
+        'url': video_url,
+        'audio_url': None,
+        'title': None,
+        'duration': None,
+        'error': None
+    }
+    
+    captured_data = {}
+    audio_url_holder = [None]
+    
+    async def handle_route(route):
+        url = route.request.url
+        if '/aweme/v1/web/aweme/detail/' in url:
+            response = await route.fetch()
+            body = await response.body()
+            try:
+                data = json.loads(body)
+                captured_data['video_detail'] = data
+                aweme = data.get('aweme_detail', {})
+                video = aweme.get('video', {})
+                play_addr = video.get('play_addr', {})
+                if play_addr.get('url_list'):
+                    audio_url_holder[0] = play_addr['url_list'][0]
+                # 同时获取标题和时长
+                result['title'] = aweme.get('desc')
+                duration = aweme.get('duration', 0)
+                if duration > 1000:
+                    duration = duration / 1000
+                result['duration'] = int(duration)
+            except:
+                pass
+            await route.fulfill(response=response)
+        else:
+            await route.continue_()
+    
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+        )
+        
+        context = await browser.new_context(viewport={'width': 1280, 'height': 800})
+        
+        # 加载 cookies
+        cookies_path = "/Volumes/movespace/workspace/Auto-home-sale-media-creator/apps/api/cookies/douyin.txt"
+        try:
+            with open(cookies_path, 'r') as f:
+                lines = f.readlines()
+            
+            cookies = []
+            for line in lines:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                parts = line.split('\t')
+                if len(parts) >= 7:
+                    cookies.append({
+                        'domain': parts[0],
+                        'path': parts[2],
+                        'name': parts[5],
+                        'value': parts[6],
+                        'secure': parts[3].upper() == 'TRUE',
+                        'httpOnly': False,
+                        'sameSite': 'Lax'
+                    })
+            
+            await context.add_cookies(cookies)
+        except Exception as e:
+            result['error'] = f'加载cookies失败: {e}'
+            return result
+        
+        page = await context.new_page()
+        await page.route("**/*", handle_route)
+        
+        try:
+            await page.goto(video_url, timeout=30000, wait_until='domcontentloaded')
+        except:
+            pass
+        
+        # 等待 API
+        for i in range(10):
+            if 'video_detail' in captured_data:
+                break
+            await asyncio.sleep(1)
+        
+        if audio_url_holder[0]:
+            result['audio_url'] = audio_url_holder[0]
+        else:
+            result['error'] = '无法获取音频URL'
+        
+        await browser.close()
+    
+    return result
+
+
 async def main():
     url = sys.argv[1] if len(sys.argv) > 1 else "https://v.douyin.com/od9jc8Ju4t8/"
+    mode = sys.argv[2] if len(sys.argv) > 2 else "full"  # full 或 audio_only
     
     try:
-        result = await extract_with_fresh_cookies(url)
-        
-        output = {
-            "success": bool(result.get('transcript')),
-            **result
-        }
-        
-        print("\n" + "="*50)
-        print("📊 提取结果:")
-        print(f"标题: {result['title']}")
-        print(f"作者: {result['author']}")
-        print(f"时长: {result['duration']}秒")
-        print(f"来源: {result['source']}")
-        print(f"字幕长度: {len(result['transcript']) if result['transcript'] else 0} 字符")
-        
-        if result['transcript']:
-            print(f"\n📝 字幕预览:\n{result['transcript'][:300]}...")
-        
-        print("\n===JSON_START===")
-        print(json.dumps(output, ensure_ascii=False))
-        print("===JSON_END===")
+        if mode == "audio_only":
+            # 仅获取音频URL
+            result = await get_audio_url_only(url)
+            print("\n===JSON_START===")
+            print(json.dumps(result, ensure_ascii=False))
+            print("===JSON_END===")
+        else:
+            # 完整提取
+            result = await extract_with_fresh_cookies(url)
+            
+            output = {
+                "success": bool(result.get('transcript')),
+                **result
+            }
+            
+            print("\n" + "="*50)
+            print("📊 提取结果:")
+            print(f"标题: {result['title']}")
+            print(f"作者: {result['author']}")
+            print(f"时长: {result['duration']}秒")
+            print(f"来源: {result['source']}")
+            print(f"字幕长度: {len(result['transcript']) if result['transcript'] else 0} 字符")
+            
+            if result['transcript']:
+                print(f"\n📝 字幕预览:\n{result['transcript'][:300]}...")
+            
+            print("\n===JSON_START===")
+            print(json.dumps(output, ensure_ascii=False))
+            print("===JSON_END===")
         
     except Exception as e:
         print(f"❌ 错误: {e}")

@@ -1,8 +1,8 @@
 /**
- * 抖音视频字幕提取服务 - v2 (yt-dlp 版本)
+ * 抖音视频字幕提取服务 - v3 (Playwright API拦截版)
  * 
- * 使用 yt-dlp 工具提取抖音视频信息和字幕
- * yt-dlp 自动处理抖音的签名验证和反爬机制
+ * 使用 Playwright Python 脚本拦截抖音 API 获取视频信息
+ * 解决 yt-dlp 需要 cookies 和页面结构变更的问题
  * 
  * @author ShadowJack
  * @date 2026-02-26
@@ -25,71 +25,38 @@ export interface SubtitleResult {
   error?: string;
 }
 
-interface YtDlpVideoInfo {
-  id: string;
-  title: string;
-  description?: string;
-  duration?: number;
-  uploader?: string;
-  uploader_id?: string;
-  subtitles?: Record<string, Array<{
-    url: string;
-    name: string;
-  }>>;
-  automatic_captions?: Record<string, Array<{
-    url: string;
-    name: string;
-  }>>;
-  webpage_url?: string;
-  original_url?: string;
-}
-
-// yt-dlp 路径
-const YT_DLP_PATH = '/opt/homebrew/bin/yt-dlp';
-
-// cookies 文件路径
-const COOKIES_PATH = path.join(__dirname, '../../cookies/douyin.txt');
+// Python 脚本路径
+const PYTHON_SCRIPT = path.join(__dirname, '../../scripts/extract-api-intercept.py');
 
 /**
- * 检查 yt-dlp 是否可用
+ * 检查 Python 和 Playwright 是否可用
  */
-async function checkYtDlp(): Promise<boolean> {
+export async function checkDependencies(): Promise<{
+  python: boolean;
+  playwright: boolean;
+  script: boolean;
+}> {
+  const result = { python: false, playwright: false, script: false };
+  
   try {
-    await execFileAsync(YT_DLP_PATH, ['--version']);
-    return true;
-  } catch {
-    // 尝试备用路径
-    try {
-      await execFileAsync('yt-dlp', ['--version']);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-}
-
-/**
- * 获取 yt-dlp 可执行路径
- */
-async function getYtDlpPath(): Promise<string | null> {
-  const paths = [YT_DLP_PATH, 'yt-dlp', '/usr/local/bin/yt-dlp'];
-  for (const p of paths) {
-    try {
-      await execFileAsync(p, ['--version']);
-      return p;
-    } catch {
-      continue;
-    }
-  }
-  return null;
+    await execFileAsync('python3', ['--version']);
+    result.python = true;
+  } catch {}
+  
+  try {
+    await execFileAsync('python3', ['-c', 'import playwright']);
+    result.playwright = true;
+  } catch {}
+  
+  result.script = fs.existsSync(PYTHON_SCRIPT);
+  
+  return result;
 }
 
 /**
  * 从抖音分享链接提取视频信息和字幕
  * 
- * 使用 yt-dlp 提取：
- * 1. 视频元数据（标题、作者、时长）
- * 2. 自动字幕（如果可用）
+ * 使用 Playwright Python 脚本拦截 API 获取数据
  * 
  * @param shareUrl - 抖音分享链接
  * @returns SubtitleResult
@@ -104,100 +71,54 @@ export async function extractDouyinSubtitle(shareUrl: string): Promise<SubtitleR
     return { success: false, error: 'Invalid URL format', source: 'none' };
   }
 
-  const ytDlpPath = await getYtDlpPath();
-  if (!ytDlpPath) {
-    return { success: false, error: 'yt-dlp not found. Please install: pip install yt-dlp', source: 'none' };
+  // 检查依赖
+  const deps = await checkDependencies();
+  if (!deps.python) {
+    return { success: false, error: 'Python3 not found', source: 'none' };
+  }
+  if (!deps.playwright) {
+    return { 
+      success: false, 
+      error: 'Playwright not installed. Run: pip3 install playwright', 
+      source: 'none' 
+    };
+  }
+  if (!deps.script) {
+    return { success: false, error: 'Extract script not found', source: 'none' };
   }
 
   try {
-    console.log(`[SubtitleExtractor] Using yt-dlp: ${ytDlpPath}`);
     console.log(`[SubtitleExtractor] Extracting: ${shareUrl}`);
 
-    // 检查 cookies 文件是否存在
-    const hasCookies = fs.existsSync(COOKIES_PATH);
-    if (hasCookies) {
-      console.log(`[SubtitleExtractor] Using cookies: ${COOKIES_PATH}`);
-    }
-
-    // 步骤1: 获取视频信息
-    const args = [
-      '--dump-json',
-      '--no-download',
-      '--quiet',
-      '--skip-download',
-      '--no-warnings',
-      '--add-header', 'Referer:https://www.douyin.com/',
-      '--add-header', 'User-Agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-    ];
-    
-    if (hasCookies) {
-      args.push('--cookies', COOKIES_PATH);
-    }
-    
-    args.push(shareUrl);
-
-    const { stdout: infoJson } = await execFileAsync(
-      ytDlpPath,
-      args,
-      { timeout: 30000, maxBuffer: 10 * 1024 * 1024 } // 30秒超时，10MB缓冲
+    // 执行 Python 脚本
+    const { stdout, stderr } = await execFileAsync(
+      'python3',
+      [PYTHON_SCRIPT, shareUrl],
+      { 
+        timeout: 60000,
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      }
     );
 
-    const videoInfo: YtDlpVideoInfo = JSON.parse(infoJson);
-    console.log(`[SubtitleExtractor] Video ID: ${videoInfo.id}`);
-    console.log(`[SubtitleExtractor] Title: ${videoInfo.title?.substring(0, 50)}...`);
-    console.log(`[SubtitleExtractor] Duration: ${videoInfo.duration}s`);
-
-    // 步骤2: 尝试获取字幕
-    let transcript: string | undefined;
-    let source: 'subtitle' | 'asr' | 'none' = 'none';
-
-    // 优先获取自动生成的字幕（抖音通常是自动字幕）
-    const autoCaptions = videoInfo.automatic_captions || videoInfo.subtitles;
+    // 解析 Python 脚本输出
+    const result = parsePythonOutput(stdout);
     
-    if (autoCaptions) {
-      console.log(`[SubtitleExtractor] Available captions:`, Object.keys(autoCaptions));
-      
-      // 优先选择中文简体
-      const langPriority = ['zh-CN', 'zh', 'zh-Hans', 'zh-TW', 'zh-Hant'];
-      let selectedLang: string | null = null;
-      
-      for (const lang of langPriority) {
-        if (autoCaptions[lang] && autoCaptions[lang].length > 0) {
-          selectedLang = lang;
-          break;
-        }
-      }
-
-      // 如果没有中文，使用第一个可用语言
-      if (!selectedLang) {
-        selectedLang = Object.keys(autoCaptions)[0];
-      }
-
-      if (selectedLang) {
-        console.log(`[SubtitleExtractor] Selected language: ${selectedLang}`);
-        
-        // 获取字幕内容（优先 JSON3 格式，通常包含完整时间戳）
-        const formats = autoCaptions[selectedLang];
-        const jsonFormat = formats.find(f => f.name?.includes('json') || f.url?.includes('json'));
-        const targetFormat = jsonFormat || formats[0];
-
-        if (targetFormat) {
-          try {
-            transcript = await fetchSubtitleContent(targetFormat.url);
-            if (transcript) source = 'subtitle';
-          } catch (err) {
-            console.error(`[SubtitleExtractor] Failed to fetch subtitle:`, err);
-          }
-        }
-      }
-    }
-
-    if (!transcript) {
+    if (result.error) {
       return {
         success: false,
-        title: videoInfo.title,
-        author: videoInfo.uploader,
-        duration: videoInfo.duration,
+        error: result.error,
+        source: 'none'
+      };
+    }
+
+    // 检查是否有字幕
+    if (!result.transcript || result.transcript.trim().length === 0) {
+      return {
+        success: false,
+        title: result.title,
+        author: result.author,
+        duration: result.duration,
         error: '该视频没有自动字幕',
         source: 'none'
       };
@@ -205,41 +126,20 @@ export async function extractDouyinSubtitle(shareUrl: string): Promise<SubtitleR
 
     return {
       success: true,
-      transcript: transcript.trim(),
-      title: videoInfo.title,
-      author: videoInfo.uploader,
-      duration: videoInfo.duration,
-      source
+      transcript: result.transcript.trim(),
+      title: result.title,
+      author: result.author,
+      duration: result.duration,
+      source: 'subtitle'
     };
 
   } catch (error) {
     console.error('[SubtitleExtractor] Error:', error);
     
-    // 解析 yt-dlp 错误信息
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     
-    if (errorMsg.includes('Video unavailable')) {
-      return { success: false, error: '视频不可用或链接已失效', source: 'none' };
-    }
-    if (errorMsg.includes('Private video')) {
-      return { success: false, error: '该视频是私密视频', source: 'none' };
-    }
-    if (errorMsg.includes('Sign in') || errorMsg.includes('cookies')) {
-      return { 
-        success: false, 
-        error: '抖音需要登录才能提取。请从浏览器导出 cookies 保存到 cookies/douyin.txt', 
-        source: 'none' 
-      };
-    }
     if (errorMsg.includes('timeout')) {
       return { success: false, error: '提取超时，请稍后重试', source: 'none' };
-    }
-    if (errorMsg.includes('parse JSON') || errorMsg.includes('Forbidden')) {
-      return { 
-        success: false, 
-        error: '抖音反爬机制阻止了提取。请配置 cookies 文件', 
-        source: 'none' 
-      };
     }
     
     return {
@@ -251,98 +151,42 @@ export async function extractDouyinSubtitle(shareUrl: string): Promise<SubtitleR
 }
 
 /**
- * 获取字幕内容
+ * 解析 Python 脚本输出
  */
-async function fetchSubtitleContent(url: string): Promise<string | undefined> {
+function parsePythonOutput(output: string): {
+  success?: boolean;
+  title?: string;
+  author?: string;
+  duration?: number;
+  transcript?: string;
+  transcriptLength?: number;
+  error?: string;
+} {
+  // 提取 JSON 部分
+  const jsonStart = output.indexOf('===JSON_START===');
+  const jsonEnd = output.indexOf('===JSON_END===');
+  
+  if (jsonStart !== -1 && jsonEnd !== -1) {
+    const jsonStr = output.substring(jsonStart + '===JSON_START==='.length, jsonEnd).trim();
+    try {
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      console.error('Failed to parse JSON output:', e);
+    }
+  }
+  
+  // 降级：尝试从整段输出解析
   try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Accept': '*/*',
+    const lines = output.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        return JSON.parse(trimmed);
       }
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
     }
-
-    const contentType = response.headers.get('content-type') || '';
-    
-    if (contentType.includes('json')) {
-      const data = await response.json();
-      return parseJsonSubtitle(data);
-    }
-    
-    // SRT 格式
-    const text = await response.text();
-    return parseSrt(text);
-    
-  } catch (error) {
-    console.error('Fetch subtitle error:', error);
-    return undefined;
-  }
-}
-
-/**
- * 解析 JSON 字幕格式
- */
-function parseJsonSubtitle(data: any): string {
-  if (Array.isArray(data)) {
-    // YouTube/抖音 JSON 格式
-    return data
-      .filter((item: any) => item.text || item.content)
-      .map((item: any) => (item.text || item.content).trim())
-      .join('\n');
-  }
+  } catch {}
   
-  if (data.events || data.utterances) {
-    // 其他 JSON 格式
-    const items = data.events || data.utterances;
-    return items
-      .filter((item: any) => item.segs || item.text)
-      .map((item: any) => {
-        if (item.segs) {
-          return item.segs.map((seg: any) => seg.utf8 || '').join('');
-        }
-        return item.text || '';
-      })
-      .join('\n');
-  }
-  
-  return '';
-}
-
-/**
- * 解析 SRT 字幕格式
- */
-function parseSrt(srtContent: string): string {
-  const lines = srtContent.split('\n');
-  const texts: string[] = [];
-  let isTextLine = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    
-    // 跳过序号和时间轴行
-    if (/^\d+$/.test(trimmed)) {
-      isTextLine = false;
-      continue;
-    }
-    if (/\d{2}:\d{2}:\d{2}[,.]\d{3}/.test(trimmed)) {
-      isTextLine = true;
-      continue;
-    }
-    if (trimmed === '') {
-      isTextLine = false;
-      continue;
-    }
-    
-    if (isTextLine && trimmed) {
-      texts.push(trimmed);
-    }
-  }
-
-  return texts.join('\n');
+  return { error: 'Failed to parse output' };
 }
 
 /**
@@ -350,7 +194,7 @@ function parseSrt(srtContent: string): string {
  */
 export async function batchExtractSubtitles(
   urls: string[],
-  concurrency: number = 2
+  concurrency: number = 1
 ): Promise<SubtitleResult[]> {
   const results: SubtitleResult[] = [];
   
@@ -363,7 +207,7 @@ export async function batchExtractSubtitles(
     
     // 添加延迟避免触发风控
     if (i + concurrency < urls.length) {
-      await delay(2000 + Math.random() * 1000);
+      await delay(3000);
     }
   }
   
@@ -375,14 +219,18 @@ function delay(ms: number): Promise<void> {
 }
 
 // 导出测试函数
-export async function testYtDlp(): Promise<{ available: boolean; version?: string }> {
-  try {
-    const ytDlpPath = await getYtDlpPath();
-    if (!ytDlpPath) return { available: false };
-    
-    const { stdout } = await execFileAsync(ytDlpPath, ['--version']);
-    return { available: true, version: stdout.trim() };
-  } catch {
-    return { available: false };
+export async function testExtractor(): Promise<{ available: boolean; message: string }> {
+  const deps = await checkDependencies();
+  
+  if (!deps.python) {
+    return { available: false, message: 'Python3 not found' };
   }
+  if (!deps.playwright) {
+    return { available: false, message: 'Playwright not installed' };
+  }
+  if (!deps.script) {
+    return { available: false, message: 'Extract script not found' };
+  }
+  
+  return { available: true, message: 'All dependencies ready' };
 }

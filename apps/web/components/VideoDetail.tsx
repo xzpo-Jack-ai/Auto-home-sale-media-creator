@@ -107,7 +107,7 @@ export function VideoDetail({ video, onBack, keyword, city }: VideoDetailProps) 
         </header>
 
         <main className="max-w-md mx-auto px-4 py-4 pb-24">
-          {loading ? (
+          {loading || !rewriteResult ? (
             <div className="flex flex-col items-center justify-center py-12">
               <RefreshCw className="w-8 h-8 text-orange-500 animate-spin mb-4" />
               <p className="text-gray-600">AI正在生成文案...</p>

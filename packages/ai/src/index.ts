@@ -16,6 +16,8 @@ export class DeepSeekClient {
   private model: string;
 
   constructor(apiKey: string, baseURL: string = 'https://api.deepseek.com/v1') {
+    console.log('[DeepSeek] Initializing with baseURL:', baseURL);
+    console.log('[DeepSeek] API Key set:', apiKey ? 'Yes (length: ' + apiKey.length + ')' : 'No');
     this.client = new OpenAI({
       apiKey,
       baseURL,
@@ -60,6 +62,7 @@ ${originalText}
 - 标签要贴合房产自媒体热门标签`;
 
     try {
+      console.log('[DeepSeek] Calling API with model:', this.model);
       const response = await this.client.chat.completions.create({
         model: this.model,
         messages: [
@@ -70,15 +73,23 @@ ${originalText}
           { role: 'user', content: prompt },
         ],
         temperature: 0.7,
-        response_format: { type: 'json_object' },
       });
+      console.log('[DeepSeek] Response received');
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
         throw new Error('Empty response from DeepSeek');
       }
 
-      const result = JSON.parse(content) as RewriteResult;
+      // Clean markdown code blocks if present
+      let jsonContent = content.trim();
+      if (jsonContent.startsWith('```json')) {
+        jsonContent = jsonContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (jsonContent.startsWith('```')) {
+        jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+
+      const result = JSON.parse(jsonContent) as RewriteResult;
       return {
         versions: result.versions || [],
         shootingTips: result.shootingTips || [],

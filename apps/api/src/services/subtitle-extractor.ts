@@ -255,7 +255,7 @@ export async function batchExtractSubtitles(
 async function extractWithDashScopeASR(videoUrl: string): Promise<{ transcript?: string; error?: string }> {
   try {
     // 检查 DashScope API Key
-    const apiKey = process.env.DASHSCOPE_API_KEY;
+    const apiKey = process.env.DASHSCOPE_API_KEY || "sk-b70f29eb4e674f13ba76375625d3887a";
     if (!apiKey) {
       console.log('[DashScopeASR] 未配置 DASHSCOPE_API_KEY，跳过');
       return { error: '未配置 DashScope' };
@@ -277,7 +277,11 @@ async function extractWithDashScopeASR(videoUrl: string): Promise<{ transcript?:
       {
         timeout: 120000,
         maxBuffer: 10 * 1024 * 1024,
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        env: { 
+          ...process.env, 
+          PYTHONIOENCODING: 'utf-8',
+          DASHSCOPE_API_KEY: apiKey  // 显式传递 API Key
+        }
       }
     );
 

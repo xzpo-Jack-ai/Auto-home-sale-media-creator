@@ -25,18 +25,23 @@ export interface SubtitleResult {
   error?: string;
 }
 
-// Python 脚本路径
+// Python 脚本路径 - API拦截版本（优先）
 const PYTHON_SCRIPT = path.join(__dirname, '../../scripts/extract-api-intercept.py');
+// ASR 兜底脚本（可选）
+const ASR_SCRIPT = path.join(__dirname, '../../scripts/asr-fallback.py');
 
 /**
- * 检查 Python 和 Playwright 是否可用
+ * 检查依赖是否可用
  */
-export async function checkDependencies(): Promise<{
+export async function checkDependencies(useAsr: boolean = false): Promise<{
   python: boolean;
   playwright: boolean;
   script: boolean;
+  asrScript?: boolean;
+  whisper?: boolean;
+  ytDlp?: boolean;
 }> {
-  const result = { python: false, playwright: false, script: false };
+  const result: any = { python: false, playwright: false, script: false };
   
   try {
     await execFileAsync('python3', ['--version']);
@@ -49,6 +54,18 @@ export async function checkDependencies(): Promise<{
   } catch {}
   
   result.script = fs.existsSync(PYTHON_SCRIPT);
+  
+  if (useAsr) {
+    result.asrScript = fs.existsSync(ASR_SCRIPT);
+    try {
+      await execFileAsync('python3', ['-c', 'import whisper']);
+      result.whisper = true;
+    } catch {}
+    try {
+      await execFileAsync('yt-dlp', ['--version']);
+      result.ytDlp = true;
+    } catch {}
+  }
   
   return result;
 }
@@ -114,12 +131,29 @@ export async function extractDouyinSubtitle(shareUrl: string): Promise<SubtitleR
 
     // 检查是否有字幕
     if (!result.transcript || result.transcript.trim().length === 0) {
+      // 尝试 ASR 兜底
+      const deps = await checkDependencies(true);
+      if (deps.asrScript && deps.whisper && deps.ytDlp) {
+        console.log('[SubtitleExtractor] 无自动字幕，尝试 ASR 兜底...');
+        const asrResult = await extractWithASR(shareUrl);
+        if (asrResult.transcript) {
+          return {
+            success: true,
+            transcript: asrResult.transcript.trim(),
+            title: result.title,
+            author: result.author,
+            duration: result.duration,
+            source: 'asr'
+          };
+        }
+      }
+      
       return {
         success: false,
         title: result.title,
         author: result.author,
         duration: result.duration,
-        error: '该视频没有自动字幕',
+        error: '该视频没有自动字幕，且 ASR 提取失败',
         source: 'none'
       };
     }
@@ -212,6 +246,32 @@ export async function batchExtractSubtitles(
   }
   
   return results;
+}
+
+/**
+ * 使用 ASR 兜底提取
+ */
+async function extractWithASR(videoUrl: string): Promise<{ transcript?: string; error?: string }> {
+  try {
+    const { stdout } = await execFileAsync(
+      'python3',
+      [ASR_SCRIPT, videoUrl],
+      {
+        timeout: 180000, // ASR 需要更长时间
+        maxBuffer: 50 * 1024 * 1024,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      }
+    );
+
+    const result = parsePythonOutput(stdout);
+    return {
+      transcript: result.transcript,
+      error: result.error
+    };
+  } catch (error) {
+    console.error('[ASR] Error:', error);
+    return { error: 'ASR 提取失败' };
+  }
 }
 
 function delay(ms: number): Promise<void> {

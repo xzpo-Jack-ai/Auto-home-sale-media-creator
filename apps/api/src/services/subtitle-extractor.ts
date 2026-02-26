@@ -29,8 +29,8 @@ export interface SubtitleResult {
 const PYTHON_SCRIPT = path.join(__dirname, '../../scripts/extract-api-intercept.py');
 // ASR 兜底脚本（可选）
 const ASR_SCRIPT = path.join(__dirname, '../../scripts/asr-fallback.py');
-// DashScope ASR 脚本 (使用 qwen-omni 模型)
-const DASHSCOPE_ASR_SCRIPT = path.join(__dirname, '../../scripts/dashscope-asr.py');
+// DashScope ASR 脚本 - 完整流程（下载+音频提取+ASR）
+const DASHSCOPE_ASR_SCRIPT = path.join(__dirname, '../../scripts/douyin-audio-asr.py');
 
 /**
  * 检查依赖是否可用
@@ -250,7 +250,7 @@ export async function batchExtractSubtitles(
 }
 
 /**
- * 使用 DashScope ASR 提取 (qwen-omni 模型)
+ * 使用 DashScope ASR 提取 (完整流程: 下载+音频提取+ASR)
  */
 async function extractWithDashScopeASR(videoUrl: string): Promise<{ transcript?: string; error?: string }> {
   try {
@@ -261,26 +261,18 @@ async function extractWithDashScopeASR(videoUrl: string): Promise<{ transcript?:
       return { error: '未配置 DashScope' };
     }
     
-    // 首先获取音频URL
-    console.log('[DashScopeASR] 获取音频 URL...');
-    const audioUrl = await getAudioUrl(videoUrl);
-    
-    if (!audioUrl) {
-      return { error: '无法获取音频 URL' };
-    }
-    
-    console.log(`[DashScopeASR] 开始转写...`);
+    console.log(`[DashScopeASR] 开始完整提取流程...`);
     
     const { stdout } = await execFileAsync(
       'python3',
-      [DASHSCOPE_ASR_SCRIPT, audioUrl],  // 使用默认模型
+      [DASHSCOPE_ASR_SCRIPT, videoUrl],
       {
-        timeout: 120000,
-        maxBuffer: 10 * 1024 * 1024,
+        timeout: 180000,  // 3分钟超时（下载+处理）
+        maxBuffer: 50 * 1024 * 1024,
         env: { 
           ...process.env, 
           PYTHONIOENCODING: 'utf-8',
-          DASHSCOPE_API_KEY: apiKey  // 显式传递 API Key
+          DASHSCOPE_API_KEY: apiKey
         }
       }
     );
@@ -288,7 +280,9 @@ async function extractWithDashScopeASR(videoUrl: string): Promise<{ transcript?:
     const result = parsePythonOutput(stdout);
     
     if (result.success && result.transcript) {
-      console.log(`[DashScopeASR] 成功: ${result.transcript.length} 字符，费用: ¥${result.cost || 0}`);
+      console.log(`[DashScopeASR] ✅ 成功: ${result.transcript.length} 字符，费用: ¥${result.cost || 0}`);
+    } else {
+      console.log(`[DashScopeASR] ❌ 失败: ${result.error}`);
     }
     
     return {

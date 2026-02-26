@@ -29,8 +29,8 @@ export interface SubtitleResult {
 const PYTHON_SCRIPT = path.join(__dirname, '../../scripts/extract-api-intercept.py');
 // ASR 兜底脚本（可选）
 const ASR_SCRIPT = path.join(__dirname, '../../scripts/asr-fallback.py');
-// 阿里云 ASR 脚本
-const ALIYUN_ASR_SCRIPT = path.join(__dirname, '../../scripts/aliyun-asr-sdk.py');
+// DashScope ASR 脚本 (使用 qwen-omni 模型)
+const DASHSCOPE_ASR_SCRIPT = path.join(__dirname, '../../scripts/dashscope-asr.py');
 
 /**
  * 检查依赖是否可用
@@ -133,13 +133,13 @@ export async function extractDouyinSubtitle(shareUrl: string): Promise<SubtitleR
 
     // 检查是否有字幕
     if (!result.transcript || result.transcript.trim().length === 0) {
-      // 尝试阿里云 ASR 兜底（优先）
-      console.log('[SubtitleExtractor] 无自动字幕，尝试阿里云 ASR...');
-      const aliyunResult = await extractWithAliyunASR(shareUrl);
-      if (aliyunResult.transcript) {
+      // 尝试 DashScope ASR 兜底
+      console.log('[SubtitleExtractor] 无自动字幕，尝试 DashScope ASR...');
+      const asrResult = await extractWithDashScopeASR(shareUrl);
+      if (asrResult.transcript) {
         return {
           success: true,
-          transcript: aliyunResult.transcript.trim(),
+          transcript: asrResult.transcript.trim(),
           title: result.title,
           author: result.author,
           duration: result.duration,
@@ -250,33 +250,30 @@ export async function batchExtractSubtitles(
 }
 
 /**
- * 使用阿里云 ASR 提取
+ * 使用 DashScope ASR 提取 (qwen-omni 模型)
  */
-async function extractWithAliyunASR(videoUrl: string): Promise<{ transcript?: string; error?: string }> {
+async function extractWithDashScopeASR(videoUrl: string): Promise<{ transcript?: string; error?: string }> {
   try {
-    // 检查阿里云配置
-    const config = process.env.ALIYUN_ACCESS_KEY_ID && 
-                   process.env.ALIYUN_ACCESS_KEY_SECRET && 
-                   process.env.ALIYUN_APP_KEY;
-    
-    if (!config) {
-      console.log('[AliyunASR] 未配置阿里云 AK/SK，跳过');
-      return { error: '未配置阿里云' };
+    // 检查 DashScope API Key
+    const apiKey = process.env.DASHSCOPE_API_KEY;
+    if (!apiKey) {
+      console.log('[DashScopeASR] 未配置 DASHSCOPE_API_KEY，跳过');
+      return { error: '未配置 DashScope' };
     }
     
-    // 首先获取音频URL（通过 API 拦截脚本）
-    console.log('[AliyunASR] 获取音频 URL...');
+    // 首先获取音频URL
+    console.log('[DashScopeASR] 获取音频 URL...');
     const audioUrl = await getAudioUrl(videoUrl);
     
     if (!audioUrl) {
       return { error: '无法获取音频 URL' };
     }
     
-    console.log(`[AliyunASR] 开始转写: ${audioUrl.substring(0, 60)}...`);
+    console.log(`[DashScopeASR] 开始转写...`);
     
     const { stdout } = await execFileAsync(
       'python3',
-      [ALIYUN_ASR_SCRIPT, audioUrl],
+      [DASHSCOPE_ASR_SCRIPT, audioUrl],  // 使用默认模型
       {
         timeout: 120000,
         maxBuffer: 10 * 1024 * 1024,
@@ -287,7 +284,7 @@ async function extractWithAliyunASR(videoUrl: string): Promise<{ transcript?: st
     const result = parsePythonOutput(stdout);
     
     if (result.success && result.transcript) {
-      console.log(`[AliyunASR] 成功: ${result.transcript.length} 字符，费用: ¥${result.cost || 0}`);
+      console.log(`[DashScopeASR] 成功: ${result.transcript.length} 字符，费用: ¥${result.cost || 0}`);
     }
     
     return {
@@ -295,8 +292,8 @@ async function extractWithAliyunASR(videoUrl: string): Promise<{ transcript?: st
       error: result.error
     };
   } catch (error) {
-    console.error('[AliyunASR] Error:', error);
-    return { error: '阿里云 ASR 失败' };
+    console.error('[DashScopeASR] Error:', error);
+    return { error: 'DashScope ASR 失败' };
   }
 }
 

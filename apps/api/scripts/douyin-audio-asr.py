@@ -128,12 +128,11 @@ async def extract_audio_and_transcribe(video_url: str):
             except Exception as e:
                 return {'success': False, 'error': f'下载异常: {str(e)}'}
             
-            # 提取音频 (前2分钟)
-            print(f"🎵 提取音频...")
+            # 提取完整音频
+            print(f"🎵 提取完整音频...")
             try:
                 subprocess.run([
                     'ffmpeg', '-i', video_path,
-                    '-t', '120',  # 只取前2分钟
                     '-vn',  # 无视频
                     '-acodec', 'libmp3lame',
                     '-ar', '16000',
@@ -141,7 +140,7 @@ async def extract_audio_and_transcribe(video_url: str):
                     '-b:a', '32k',  # 低码率减小文件
                     audio_path,
                     '-y'
-                ], check=True, capture_output=True, timeout=30)
+                ], check=True, capture_output=True, timeout=120)  # 增加超时时间
                 
                 audio_size = os.path.getsize(audio_path)
                 print(f"✅ 音频提取完成: {audio_size/1024:.1f}KB")

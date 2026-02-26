@@ -151,7 +151,7 @@ export function VideoDetail({ video, onBack, keyword, city }: VideoDetailProps) 
               {/* Content */}
               {activeTab === 'rewrite' ? (
                 <div className="space-y-4">
-                  {rewriteResult?.versions.map((version, i) => (
+                  {rewriteResult?.versions?.map((version, i) => (
                     <div key={i} className="bg-white rounded-xl p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-medium text-orange-500">
@@ -182,7 +182,7 @@ export function VideoDetail({ video, onBack, keyword, city }: VideoDetailProps) 
                   <div className="bg-white rounded-xl p-4">
                     <h3 className="text-sm font-medium text-gray-500 mb-3">推荐标签</h3>
                     <div className="flex flex-wrap gap-2">
-                      {rewriteResult?.suggestedTags.map((tag) => (
+                      {rewriteResult?.suggestedTags?.map((tag) => (
                         <span
                           key={tag}
                           className="px-3 py-1 bg-orange-50 text-orange-600 text-xs rounded-full"
@@ -195,7 +195,7 @@ export function VideoDetail({ video, onBack, keyword, city }: VideoDetailProps) 
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {rewriteResult?.shootingTips.map((tip, i) => (
+                  {rewriteResult?.shootingTips?.map((tip, i) => (
                     <div key={i} className="bg-white rounded-xl p-4">
                       <div className="flex gap-3">
                         <span className="flex-shrink-0 w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-bold">

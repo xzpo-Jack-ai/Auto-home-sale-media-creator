@@ -68,16 +68,30 @@ export class VideoDAO {
 
   /**
    * 批量插入视频
+   * 注意：SQLite 不支持 skipDuplicates，需要逐个插入并处理冲突
    */
   static async createMany(data: VideoData[]) {
-    return prisma.video.createMany({
-      data: data.map((d) => ({
-        ...d,
-        shares: d.shares ?? 0,
-        comments: d.comments ?? 0,
-      })),
-      skipDuplicates: true,
-    });
+    // SQLite 不支持 createMany + skipDuplicates，使用事务逐个插入
+    const results = await prisma.$transaction(
+      data.map((d) =>
+        prisma.video.upsert({
+          where: { externalId: d.externalId || `${d.platform}-${Date.now()}` },
+          update: {
+            title: d.title,
+            transcript: d.transcript,
+            views: d.views,
+            likes: d.likes,
+          },
+          create: {
+            ...d,
+            externalId: d.externalId || `${d.platform}-${Date.now()}`,
+            shares: d.shares ?? 0,
+            comments: d.comments ?? 0,
+          },
+        })
+      )
+    );
+    return { count: results.length };
   }
 
   /**

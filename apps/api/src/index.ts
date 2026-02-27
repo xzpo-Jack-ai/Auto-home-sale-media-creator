@@ -11,6 +11,8 @@ import { videoRoutes } from './routes/videos';
 import { aiRoutes } from './routes/ai';
 import { uploadRoutes } from './routes/upload';
 import { videoLinkRoutes } from './routes/video-link';
+import { hotTrendRoutes } from './routes/hot-trends';
+import { startHotTrendScheduler } from './jobs/update-hot-trends.job';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -35,6 +37,7 @@ app.use('/api/videos', videoRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/video-link', videoLinkRoutes);
+app.use('/api/hot-trends', hotTrendRoutes);
 
 // Error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -44,4 +47,8 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 
 app.listen(PORT, () => {
   console.log(`🚀 API server running on port ${PORT}`);
+
+  // 启动热词定时更新任务
+  startHotTrendScheduler();
+  console.log('📅 Hot trend scheduler started (daily at 08:00)');
 });

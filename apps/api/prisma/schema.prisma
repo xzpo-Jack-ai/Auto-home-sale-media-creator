@@ -80,3 +80,21 @@ model PublishLog {
   @@index([status])
   @@map("publish_logs")
 }
+
+// 抖音热榜数据（每天更新）
+model HotTrend {
+  id        String   @id @default(uuid())
+  city      String                    // 城市名称
+  keyword   String                    // 热词文本
+  heat      Int                       // 热度值
+  rank      Int                       // 排名
+  source    String   @default("douyin") // 数据来源
+  fetchedAt DateTime                  // 抓取时间（用于按天分组）
+  createdAt DateTime @default(now())
+
+  // 联合唯一约束：同一城市同一天同一关键词只保留一条
+  @@unique([city, keyword, fetchedAt])
+  @@index([city, heat])
+  @@index([fetchedAt])
+  @@map("hot_trends")
+}

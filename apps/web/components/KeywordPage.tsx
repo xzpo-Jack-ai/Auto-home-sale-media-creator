@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { VideoList } from './VideoList';
+import { useRouter } from 'next/navigation';
 import { TrendingUp, MapPin, ChevronDown } from 'lucide-react';
 
 interface Keyword {
@@ -10,14 +10,32 @@ interface Keyword {
   heat: number;
 }
 
+interface HotTrendData {
+  city: string;
+  trends: Array<{
+    id: string;
+    keyword: string;
+    heat: number;
+    rank: number;
+  }>;
+  updatedAt?: string;
+  message?: string;
+}
+
 const CITIES = ['北京', '上海', '深圳', '广州', '杭州', '成都'];
 
 export function KeywordPage() {
+  const router = useRouter();
   const [selectedCity, setSelectedCity] = useState('北京');
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<string>('');
+  const [dataMessage, setDataMessage] = useState<string>('');
+  const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [updateMessage, setUpdateMessage] = useState<string>('');
+  const [updateTime, setUpdateTime] = useState<string>('');
+  const [dataSource, setDataSource] = useState<'douyin' | 'local'>('local');
 
   useEffect(() => {
     fetchKeywords(selectedCity);
@@ -25,26 +43,33 @@ export function KeywordPage() {
 
   const fetchKeywords = async (city: string) => {
     setLoading(true);
+    setDataMessage('');
     try {
-      const res = await fetch(`/api/keywords?city=${encodeURIComponent(city)}`);
-      const data = await res.json();
-      setKeywords(data.keywords || []);
+      // 使用新的热词趋势 API
+      const res = await fetch(`/api/hot-trends?city=${encodeURIComponent(city)}&limit=20`);
+      const data: HotTrendData = await res.json();
+
+      if (data.trends && data.trends.length > 0) {
+        // 转换为 Keyword 格式
+        setKeywords(data.trends.map((t) => ({
+          id: t.id,
+          text: t.keyword,
+          heat: t.heat,
+        })));
+        setUpdatedAt(data.updatedAt || '');
+      } else {
+        // 如果没有热词数据，显示提示
+        setKeywords([]);
+        setDataMessage(data.message || '暂无热词数据');
+      }
     } catch (error) {
       console.error('Failed to fetch keywords:', error);
+      setKeywords([]);
+      setDataMessage('获取数据失败，请稍后重试');
     } finally {
       setLoading(false);
     }
   };
-
-  if (selectedKeyword) {
-    return (
-      <VideoList
-        keyword={selectedKeyword}
-        city={selectedCity}
-        onBack={() => setSelectedKeyword(null)}
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
@@ -94,6 +119,19 @@ export function KeywordPage() {
             <h2 className="text-lg font-bold text-gray-900">今日房产热词</h2>
           </div>
 
+          {dataMessage && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-700">{dataMessage}</p>
+              <p className="text-xs text-yellow-600 mt-1">每天 08:00 自动更新</p>
+            </div>
+          )}
+
+          {updatedAt && (
+            <p className="text-xs text-gray-400 mb-4">
+              更新时间: {new Date(updatedAt).toLocaleString('zh-CN')}
+            </p>
+          )}
+
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
@@ -105,7 +143,7 @@ export function KeywordPage() {
               {keywords.map((keyword, index) => (
                 <button
                   key={keyword.id}
-                  onClick={() => setSelectedKeyword(keyword.text)}
+                  onClick={() => router.push(`/hot/${encodeURIComponent(keyword.text)}?city=${encodeURIComponent(selectedCity)}`)}
                   className="w-full flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-orange-50 transition group"
                 >
                   <span

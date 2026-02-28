@@ -45,22 +45,34 @@ export function KeywordPage() {
     setLoading(true);
     setDataMessage('');
     try {
-      // 使用新的热词趋势 API
-      const res = await fetch(`/api/hot-trends?city=${encodeURIComponent(city)}&limit=20`);
-      const data: HotTrendData = await res.json();
+      // 优先使用 keywords API（从抖音抓取的真实数据）
+      const res = await fetch(`/api/keywords?city=${encodeURIComponent(city)}`);
+      const data = await res.json();
 
-      if (data.trends && data.trends.length > 0) {
-        // 转换为 Keyword 格式
-        setKeywords(data.trends.map((t) => ({
-          id: t.id,
-          text: t.keyword,
-          heat: t.heat,
+      if (data.keywords && data.keywords.length > 0) {
+        // 直接使用 keywords 数据
+        setKeywords(data.keywords.map((k: any) => ({
+          id: k.id,
+          text: k.text,
+          heat: k.heat,
         })));
         setUpdatedAt(data.updatedAt || '');
       } else {
-        // 如果没有热词数据，显示提示
-        setKeywords([]);
-        setDataMessage(data.message || '暂无热词数据');
+        // 如果没有数据，尝试 hot-trends API 作为备用
+        const hotRes = await fetch(`/api/hot-trends?city=${encodeURIComponent(city)}&limit=20`);
+        const hotData: HotTrendData = await hotRes.json();
+
+        if (hotData.trends && hotData.trends.length > 0) {
+          setKeywords(hotData.trends.map((t) => ({
+            id: t.id,
+            text: t.keyword,
+            heat: t.heat,
+          })));
+          setUpdatedAt(hotData.updatedAt || '');
+        } else {
+          setKeywords([]);
+          setDataMessage(data.message || hotData.message || '暂无热词数据');
+        }
       }
     } catch (error) {
       console.error('Failed to fetch keywords:', error);

@@ -87,9 +87,13 @@ class PersistentSessionManager:
             # 等待用户登录
             print("⏳ 等待登录...")
             print("   请在浏览器中完成扫码登录")
-            print("   登录完成后，请在此按回车键继续...")
+            print("   登录成功后，脚本将在 60 秒后自动保存 Cookie...")
             
-            input()  # 等待用户按回车
+            # 倒计时等待
+            for i in range(60, 0, -1):
+                if i % 10 == 0:
+                    print(f"   还剩 {i} 秒...")
+                await asyncio.sleep(1)
             
             # 验证登录状态
             is_logged_in = await self._verify_login(page)

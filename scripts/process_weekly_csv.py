@@ -107,65 +107,51 @@ class WeeklyCSVProcessor:
         
         return video
     
-    def analyze_hot_keywords(self, videos: List[Dict]) -> Dict[str, List[Dict]]:
-        """分析热词并归类视频"""
+    async def analyze_hot_keywords(self, videos: List[Dict]) -> Dict[str, List[Dict]]:
+        """使用AI分析热词并归类视频"""
         print("\n🔥 分析热词...")
         
-        # 简单的关键词提取（可以用AI优化）
-        keyword_map = {}
+        # 导入AI分析器
+        from ai_hot_keyword_analyzer import AIHotKeywordAnalyzer, Video
         
-        for video in videos:
-            title = video.get('extracted_title', '') or video.get('title', '')
-            city = video.get('city', '未知')
-            
-            # 提取关键词（简单规则，后续可换成AI）
-            keywords = self._extract_keywords(title, city)
-            
-            for keyword in keywords:
-                if keyword not in keyword_map:
-                    keyword_map[keyword] = []
-                keyword_map[keyword].append(video)
-        
-        # 按视频数量排序，取前N个热词
-        sorted_keywords = sorted(
-            keyword_map.items(),
-            key=lambda x: len(x[1]),
-            reverse=True
-        )
-        
-        print(f"   ✅ 发现 {len(sorted_keywords)} 个热词")
-        for kw, vids in sorted_keywords[:10]:
-            print(f"      • {kw}: {len(vids)} 个视频")
-        
-        return dict(sorted_keywords)
-    
-    def _extract_keywords(self, title: str, city: str) -> List[str]:
-        """从标题提取关键词（简单版本）"""
-        keywords = []
-        
-        # 房产相关关键词库
-        keyword_patterns = [
-            ('学区房', ['学区', '学校', '教育']),
-            ('新房', ['新房', '开盘', '楼盘']),
-            ('二手房', ['二手', '置换', '改善']),
-            ('房价', ['房价', '涨跌', '价格']),
-            ('政策', ['政策', '限购', '调控']),
-            ('房贷', ['房贷', '利率', '贷款']),
-            ('投资', ['投资', '升值', '回报']),
-            ('区域', ['海淀', '朝阳', '浦东', '徐汇']),  # 可根据城市扩展
+        # 转换为Video对象
+        video_objects = [
+            Video(
+                city=v['city'],
+                title=v.get('extracted_title', '') or v.get('title', ''),
+                url=v['video_url'],
+                transcript=v.get('transcript', '')
+            )
+            for v in videos
         ]
         
-        for keyword, patterns in keyword_patterns:
-            for pattern in patterns:
-                if pattern in title:
-                    keywords.append(f"{city}-{keyword}")
-                    break
+        # AI分析
+        analyzer = AIHotKeywordAnalyzer()
+        hot_keywords = await analyzer.analyze_with_fallback(video_objects)
         
-        # 如果没有匹配到，使用城市+通用标签
-        if not keywords:
-            keywords.append(f"{city}-房产")
+        # 转换回字典格式
+        keyword_map = {}
+        for kw in hot_keywords:
+            keyword_key = f"{kw.videos[0].city if kw.videos else '未知'}-{kw.keyword}"
+            keyword_map[keyword_key] = [
+                {
+                    'city': v.city,
+                    'title': v.title,
+                    'video_url': v.url,
+                    'transcript': v.transcript,
+                    'heat_score': kw.heat_score,
+                    'category': kw.category
+                }
+                for v in kw.videos
+            ]
         
-        return keywords
+        print(f"   ✅ AI发现 {len(keyword_map)} 个热词")
+        for kw, vids in sorted(keyword_map.items(), key=lambda x: len(x[1]), reverse=True)[:10]:
+            heat = vids[0].get('heat_score', 50) if vids else 50
+            cat = vids[0].get('category', '其他') if vids else '其他'
+            print(f"      • {kw} (热度:{heat}, {cat}): {len(vids)} 个视频")
+        
+        return keyword_map
     
     def save_to_database(self, videos: List[Dict], hot_keywords: Dict):
         """保存到数据库"""

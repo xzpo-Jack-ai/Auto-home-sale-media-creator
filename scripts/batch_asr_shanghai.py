@@ -27,7 +27,7 @@ def get_shanghai_videos_without_transcript():
         FROM videos
         WHERE city = '上海' AND (transcript IS NULL OR transcript = '') AND videoUrl LIKE '%douyin%'
         ORDER BY likes DESC
-        LIMIT 5
+        LIMIT 100
     ''')
     
     videos = []

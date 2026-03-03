@@ -8,6 +8,7 @@ import zipfile
 import re
 import json
 import sqlite3
+import html
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -94,6 +95,8 @@ def extract_excel_data(file_path: str) -> List[Dict]:
                             si = int(value)
                             if si < len(shared_strings):
                                 value = shared_strings[si]
+                        # 解码 HTML 实体（如 &#38738; → 青）
+                        value = html.unescape(value)
                         video[field] = value
                 
                 # 只保留有音频链接的记录
@@ -143,30 +146,51 @@ def save_to_database(videos: List[Dict]):
         for v in videos:
             external_id = f"dy_excel_{hash(v.get('video_url', '')) % 1000000}_{int(datetime.now().timestamp())}"
             
+            # 处理发布时间
+            publish_time = v.get('publish_time', '')
+            if not publish_time or publish_time == 'None':
+                publish_time = datetime.now().isoformat()
+            
+            # 处理城市和关键词
+            keyword = v.get('hot_keywords', '')
+            if not keyword or keyword == 'None':
+                keyword = '房产综合'
+            
+            # 从热词或作者推断城市
+            city = '未知'
+            if '上海' in keyword or '上海' in v.get('author', ''):
+                city = '上海'
+            elif '北京' in keyword or '北京' in v.get('author', ''):
+                city = '北京'
+            elif '深圳' in keyword or '深圳' in v.get('author', ''):
+                city = '深圳'
+            elif '杭州' in keyword or '杭州' in v.get('author', ''):
+                city = '杭州'
+            
             cursor.execute('''
                 INSERT OR REPLACE INTO videos (
                     id, externalId, platform, title, author, authorId,
                     views, likes, shares, comments, coverUrl, videoUrl,
-                    duration, transcript, keyword, city, createdAt, updatedAt
+                    duration, transcript, publishedAt, keyword, city, updatedAt
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 external_id,
                 external_id,
                 'douyin',
-                v.get('hot_keywords', '')[:150],
-                v.get('author', ''),
+                keyword[:150] if len(keyword) > 150 else keyword,
+                v.get('author', '未知作者')[:50],
                 '',
-                0,  # views
-                int(float(v.get('likes', 0) or 0)),
-                int(float(v.get('shares', 0) or 0)),
-                int(float(v.get('comments', 0) or 0)),
+                0,
+                int(float(v.get('likes', 0))) if v.get('likes') and str(v.get('likes')).replace('.','').isdigit() else 0,
+                int(float(v.get('shares', 0))) if v.get('shares') and str(v.get('shares')).replace('.','').isdigit() else 0,
+                int(float(v.get('comments', 0))) if v.get('comments') and str(v.get('comments')).replace('.','').isdigit() else 0,
                 v.get('cover_url', ''),
                 v.get('video_url', ''),
                 v.get('duration', ''),
                 v.get('transcript', '')[:2000],
-                v.get('hot_keywords', ''),
-                '未知',  # city 需要从内容推断
-                v.get('publish_time', datetime.now().isoformat()),
+                publish_time,
+                keyword[:50],
+                city,
                 datetime.now().isoformat()
             ))
             saved += 1

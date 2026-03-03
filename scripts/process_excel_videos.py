@@ -156,16 +156,20 @@ def save_to_database(videos: List[Dict]):
             if not keyword or keyword == 'None':
                 keyword = '房产综合'
             
-            # 从热词或作者推断城市
-            city = '未知'
-            if '上海' in keyword or '上海' in v.get('author', ''):
-                city = '上海'
-            elif '北京' in keyword or '北京' in v.get('author', ''):
+            # 从热词、作者、话题推断城市（默认上海）
+            city = '上海'  # 根据用户输入，这批数据都是上海的
+            author = v.get('author', '')
+            topics = v.get('topics', '')
+            
+            # 如果明确提到其他城市，再修改
+            if '北京' in keyword or '北京' in author or '北京' in topics:
                 city = '北京'
-            elif '深圳' in keyword or '深圳' in v.get('author', ''):
+            elif '深圳' in keyword or '深圳' in author or '深圳' in topics:
                 city = '深圳'
-            elif '杭州' in keyword or '杭州' in v.get('author', ''):
+            elif '杭州' in keyword or '杭州' in author or '杭州' in topics:
                 city = '杭州'
+            elif '广州' in keyword or '广州' in author or '广州' in topics:
+                city = '广州'
             
             cursor.execute('''
                 INSERT OR REPLACE INTO videos (

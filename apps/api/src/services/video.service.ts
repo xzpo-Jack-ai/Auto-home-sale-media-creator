@@ -33,28 +33,23 @@ export class VideoDAO {
     city: string,
     page: number = 1,
     pageSize: number = 20
-  ): Promise<{ videos: Video[]; total: number }> {
+  ): Promise<{ videos: any[]; total: number }> {
     const skip = (page - 1) * pageSize;
 
-    const [videos, total] = await Promise.all([
-      prisma.video.findMany({
-        where: {
-          keyword: { contains: keyword },
-          city,
-        },
-        orderBy: [{ views: 'desc' }, { likes: 'desc' }],
-        skip,
-        take: pageSize,
-      }),
-      prisma.video.count({
-        where: {
-          keyword: { contains: keyword },
-          city,
-        },
-      }),
-    ]);
+    // 使用原始SQL查询避免Prisma字符编码问题
+    const videos = await prisma.$queryRawUnsafe(
+      `SELECT * FROM videos WHERE keyword = ? AND city = ? ORDER BY views DESC, likes DESC LIMIT ? OFFSET ?`,
+      keyword, city, pageSize, skip
+    );
 
-    return { videos, total };
+    const countResult = await prisma.$queryRawUnsafe(
+      `SELECT COUNT(*) as count FROM videos WHERE keyword = ? AND city = ?`,
+      keyword, city
+    );
+
+    const total = Number((countResult as any)[0].count);
+
+    return { videos: videos as any[], total };
   }
 
   /**

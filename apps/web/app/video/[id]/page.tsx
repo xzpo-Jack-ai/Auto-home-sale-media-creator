@@ -14,6 +14,7 @@ interface Video {
   duration: number;
   publishedAt: string;
   transcript: string;
+  videoUrl?: string;
 }
 
 export default function VideoDetailPage() {
@@ -129,13 +130,20 @@ export default function VideoDetailPage() {
         {/* Video Info Card */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
           {/* Cover */}
-          <div className="relative aspect-video">
+          <div 
+            className="relative aspect-video cursor-pointer"
+            onClick={() => {
+              if (video.videoUrl) {
+                window.open(video.videoUrl, '_blank');
+              }
+            }}
+          >
             <img
               src={video.cover}
               alt={video.title}
               className="w-full h-full object-cover"
             />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition">
               <Play className="w-16 h-16 text-white" />
             </div>
           </div>

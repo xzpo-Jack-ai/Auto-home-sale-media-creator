@@ -13,6 +13,7 @@ interface Video {
   cover: string;
   duration: number;
   publishedAt: string;
+  videoUrl?: string;
 }
 
 export default function HotTrendVideosPage() {
@@ -55,9 +56,14 @@ export default function HotTrendVideosPage() {
     }
   };
 
-  const handleVideoClick = (videoId: string) => {
-    // 跳转到视频详情页（复用现有路由）
-    router.push(`/video/${videoId}?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent(city)}`);
+  const handleVideoClick = (video: Video) => {
+    // 如果有视频URL，跳转到抖音播放页
+    if (video.videoUrl && video.videoUrl.includes('douyin')) {
+      window.open(video.videoUrl, '_blank');
+    } else {
+      // 否则跳转到详情页
+      router.push(`/video/${video.id}?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent(city)}`);
+    }
   };
 
   const formatNumber = (num: number) => {
@@ -136,7 +142,7 @@ export default function HotTrendVideosPage() {
             {videos.map((video, index) => (
               <button
                 key={video.id}
-                onClick={() => handleVideoClick(video.id)}
+                onClick={() => handleVideoClick(video)}
                 className="w-full bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition text-left"
               >
                 <div className="flex gap-4">

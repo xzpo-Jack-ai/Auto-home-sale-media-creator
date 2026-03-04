@@ -34,10 +34,9 @@ export function VideoList({ keyword, city, onBack }: VideoListProps) {
   const fetchVideos = async () => {
     setLoading(true);
     try {
+      // 使用新的 videos-simple 端点绕过Prisma编码问题
       const res = await fetch(
-        `/api/videos?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent(
-          city
-        )}&page=${page}`
+        `/api/videos-simple?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent(city)}`
       );
       const data = await res.json();
       setVideos(data.videos || []);

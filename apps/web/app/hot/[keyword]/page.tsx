@@ -36,8 +36,9 @@ export default function HotTrendVideosPage() {
     setError('');
 
     try {
+      // 使用 videos-simple 端点获取视频列表
       const res = await fetch(
-        `/api/hot-trends/${encodeURIComponent(keyword)}/videos?city=${encodeURIComponent(city)}&limit=20`
+        `/api/videos-simple?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent(city)}`
       );
       const data = await res.json();
 

@@ -158,7 +158,9 @@ export default function HotTrendVideosPage() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-gray-900 line-clamp-2 mb-2">
-                      {video.title}
+                      {video.title && video.title !== '[]' && !video.title.startsWith('http') 
+                        ? video.title 
+                        : `${video.author}的视频`}
                     </h3>
                     <p className="text-sm text-gray-500 mb-2">@{video.author}</p>
                     <div className="flex items-center gap-4 text-xs text-gray-400">

@@ -45,7 +45,7 @@ app.get('/api/videos-simple', async (req, res) => {
 
     // 使用Prisma但只选择基本字段，避免字符编码问题
     const videos = await prisma.$queryRaw`
-      SELECT id, title, author, views, likes, "coverUrl", duration, "publishedAt", transcript 
+      SELECT id, title, author, views, likes, "coverUrl", "videoUrl", duration, "publishedAt", transcript 
       FROM videos 
       WHERE keyword = ${keyword as string} AND city = ${city as string}
       ORDER BY likes DESC
@@ -60,6 +60,7 @@ app.get('/api/videos-simple', async (req, res) => {
         views: v.views || 0,
         likes: v.likes || 0,
         cover: v.coverUrl || `https://picsum.photos/300/400?random=${v.id}`,
+        videoUrl: v.videoUrl,
         duration: v.duration || 60,
         publishedAt: v.publishedAt,
         transcript: v.transcript,

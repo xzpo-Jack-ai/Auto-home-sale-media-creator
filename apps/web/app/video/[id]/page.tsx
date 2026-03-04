@@ -72,7 +72,12 @@ export default function VideoDetailPage() {
         })
       });
       const data = await res.json();
-      setRewrittenText(data.rewritten || data.text || '改写失败');
+      // API返回 versions 数组，取第一个版本
+      if (data.versions && data.versions.length > 0) {
+        setRewrittenText(data.versions[0]);
+      } else {
+        setRewrittenText(data.rewritten || data.text || '改写失败');
+      }
     } catch (err) {
       console.error('Rewrite failed:', err);
       setRewrittenText('改写服务暂时不可用');

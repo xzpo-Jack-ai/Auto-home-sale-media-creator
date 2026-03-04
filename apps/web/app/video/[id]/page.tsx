@@ -67,8 +67,7 @@ export default function VideoDetailPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          transcript: video.transcript,
-          style: 'professional'
+          text: video.transcript
         })
       });
       const data = await res.json();

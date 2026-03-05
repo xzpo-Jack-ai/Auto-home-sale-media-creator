@@ -255,9 +255,9 @@ export function VideoDetail({ video, onBack, keyword, city }: VideoDetailProps) 
         </button>
       </header>
 
-      {/* Video Cover with Play Button */}
+      {/* Video Cover with Play Button - 16:9比例更美观 */}
       <div 
-        className="relative aspect-[3/4] bg-gray-800 cursor-pointer"
+        className="relative aspect-video bg-gray-800 cursor-pointer max-h-[50vh]"
         onClick={() => {
           // 如果有抖音链接，跳转到抖音播放
           if (video.videoUrl && video.videoUrl.includes('douyin')) {
@@ -272,12 +272,14 @@ export function VideoDetail({ video, onBack, keyword, city }: VideoDetailProps) 
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-gray-800" />
+          <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+            <span className="text-gray-500">暂无封面</span>
+          </div>
         )}
-        {/* Play Button Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition">
-          <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center">
-            <Camera className="w-8 h-8 text-white" />
+        {/* Play Button Overlay - 更小的按钮 */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition">
+          <div className="w-14 h-14 bg-white/30 backdrop-blur rounded-full flex items-center justify-center">
+            <Camera className="w-6 h-6 text-white" />
           </div>
         </div>
       </div>

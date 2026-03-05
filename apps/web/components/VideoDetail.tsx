@@ -15,6 +15,7 @@ interface Video {
   publishedAt: string;
   description?: string;
   transcript?: string;
+  videoUrl?: string;
 }
 
 interface VideoDetailProps {
@@ -254,19 +255,40 @@ export function VideoDetail({ video, onBack, keyword, city }: VideoDetailProps) 
         </button>
       </header>
 
-      {/* Video Player Placeholder */}
-      <div className="aspect-[3/4] bg-gray-800 flex items-center justify-center">
-        <div className="text-center text-white">
-          <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Camera className="w-8 h-8" />
+      {/* Video Cover with Play Button */}
+      <div 
+        className="relative aspect-[3/4] bg-gray-800 cursor-pointer"
+        onClick={() => {
+          // 如果有抖音链接，跳转到抖音播放
+          if (video.videoUrl && video.videoUrl.includes('douyin')) {
+            window.open(video.videoUrl, '_blank');
+          }
+        }}
+      >
+        {video.cover ? (
+          <img 
+            src={video.cover} 
+            alt={video.author}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-800" />
+        )}
+        {/* Play Button Overlay */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition">
+          <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center">
+            <Camera className="w-8 h-8 text-white" />
           </div>
-          <p className="text-gray-400">视频播放器</p>
         </div>
       </div>
 
       {/* Info */}
       <div className="p-4">
-        <h1 className="text-white text-lg font-bold mb-2">{video.title}</h1>
+        <h1 className="text-white text-lg font-bold mb-2">
+          {video.title && video.title !== '[]' && !video.title.startsWith('http')
+            ? video.title 
+            : `${video.author}的房产视频`}
+        </h1>
         <p className="text-gray-400 text-sm mb-4">
           @{video.author} · {formatNumber(video.views)}播放 · {formatNumber(video.likes)}赞
         </p>

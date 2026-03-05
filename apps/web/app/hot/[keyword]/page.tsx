@@ -57,13 +57,8 @@ export default function HotTrendVideosPage() {
   };
 
   const handleVideoClick = (video: Video) => {
-    // 如果有视频URL，跳转到抖音播放页
-    if (video.videoUrl && video.videoUrl.includes('douyin')) {
-      window.open(video.videoUrl, '_blank');
-    } else {
-      // 否则跳转到详情页
-      router.push(`/video/${video.id}?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent(city)}`);
-    }
+    // 跳转到视频详情页
+    router.push(`/video/${video.id}?keyword=${encodeURIComponent(keyword)}&city=${encodeURIComponent(city)}`);
   };
 
   const formatNumber = (num: number) => {
